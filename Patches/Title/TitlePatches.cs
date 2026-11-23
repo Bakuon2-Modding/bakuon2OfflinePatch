@@ -257,6 +257,9 @@ namespace BakuonOfflinePatch
                 // Photon プレイヤー名も設定
                 PhotonNetwork.playerName = inputName;
 
+                // 改名時の設定移行元として変更前の名前を控える (StableSaveTags.Migrate)
+                StableSaveTags.PreviousPlayerName = OfflineSaveDataManager.LoadPlayerName();
+
                 // セーブデータにプレイヤー名を保存
                 OfflineSaveDataManager.SavePlayerName(inputName);
 

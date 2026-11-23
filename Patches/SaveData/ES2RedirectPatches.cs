@@ -22,6 +22,7 @@ namespace BakuonOfflinePatch
         private static FieldInfo _fd_filename;
         private static FieldInfo _fd_filePath;
         private static FieldInfo _fd_playerPrefsPath;
+        private static FieldInfo _fd_tag;
 
         public static void ApplyPatches(Harmony harmony)
         {
@@ -73,6 +74,7 @@ namespace BakuonOfflinePatch
                 _fd_filename = fdType.GetField("filename", bindFlags);
                 _fd_filePath = fdType.GetField("filePath", bindFlags);
                 _fd_playerPrefsPath = fdType.GetField("playerPrefsPath", bindFlags);
+                _fd_tag = fdType.GetField("tag", bindFlags);
 
                 // コンストラクタをパッチ
                 var postfix = new HarmonyMethod(typeof(ES2RedirectPatches), nameof(ES2Settings_Ctor_Postfix));
@@ -99,6 +101,25 @@ namespace BakuonOfflinePatch
             }
         }
 
+        /// <summary>tag を StableSaveTags で読み替え、fullString も合わせる。変更したら true</summary>
+        private static bool RewriteTag(object fdObj)
+        {
+            if (_fd_tag == null) return false;
+            string tag = _fd_tag.GetValue(fdObj) as string;
+            if (string.IsNullOrEmpty(tag)) return false;
+            string newTag = StableSaveTags.Rewrite(tag);
+            if (newTag == tag) return false;
+
+            _fd_tag.SetValue(fdObj, newTag);
+            if (_fd_fullString != null)
+            {
+                string fullStr = _fd_fullString.GetValue(fdObj) as string;
+                if (fullStr != null && fullStr.Contains(tag))
+                    _fd_fullString.SetValue(fdObj, fullStr.Replace(tag, newTag));
+            }
+            return true;
+        }
+
         static void ES2Settings_Ctor_Postfix(object __instance)
         {
             try
@@ -111,8 +132,17 @@ namespace BakuonOfflinePatch
                 // filenameフィールドをチェック（これが "saveData" を含むかが判定基準）
                 if (_fd_filename == null) return;
                 string filename = _fd_filename.GetValue(fdObj) as string;
-                if (filename == null || !filename.Contains(ORIGINAL_FILE) || filename.Contains(OFFLINE_FILE))
+                if (filename == null || !filename.Contains(ORIGINAL_FILE))
                     return;
+
+                // userID 依存タグ (エモートチャット等) を名前非依存の固定キーへ読み替え
+                bool tagChanged = RewriteTag(fdObj);
+
+                if (filename.Contains(OFFLINE_FILE))
+                {
+                    if (tagChanged) _filenameDataField.SetValue(__instance, fdObj);
+                    return;
+                }
 
                 // リダイレクト実行: 全関連フィールドを書き換え
                 string newFilename = filename.Replace(ORIGINAL_FILE, OFFLINE_FILE);

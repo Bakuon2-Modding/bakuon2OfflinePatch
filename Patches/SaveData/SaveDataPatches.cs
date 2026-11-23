@@ -233,6 +233,8 @@ namespace BakuonOfflinePatch
                         UnitData.RenewStockUnitDataFromStringList(unitDataList);
                     }
                 }
+                // バニラのログイン時と同じ重複除去+残りクラスポイント再計算 (自己修復)
+                ClassAbilityRepair.RepairAll();
 
                 // アイテムデータを読み込み
                 if (ES2.Exists(SAVE_FILE + "?tag=" + TAG_ITEM_DATA))
@@ -864,6 +866,9 @@ namespace BakuonOfflinePatch
             try
             {
                 string uid = __instance.userID;
+
+                // 旧 userID タグ → 固定キーへの一回限りの移行 (以降のタグは ES2RedirectPatches が固定キーへ読み替える)
+                StableSaveTags.Migrate(uid);
 
                 __instance.latestRoomName = LoadStr(uid, "latestRoomName", "");
                 __instance.resumeSuteageSeed = LoadInt(uid, "resumeSuteageSeed", 0);
